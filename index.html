@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Noughts | Internal Network</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Azeret+Mono:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --black:#000;--side:#000;--band:#232323;--bg:#161616;--panel:#000;--raise:#303030;--line:#2b2b2b;
+  --text:#f2f2f2;--muted:#8a8a8a;--dim:#5e5e5e;
+  --orange:#ff4f00;--orange2:#c43a00;--orange-soft:#3a1503;
+  --amber:#e8b04a;--green:#6ccf9a;--red:#ff6a5c;
+  --mono:"Azeret Mono",ui-monospace,Consolas,monospace;
+  --sans:"Archivo","Segoe UI",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:12px}
+body{margin:0;background:var(--bg);color:var(--text);font:400 12px/1.55 var(--mono)}
+button,input,textarea,select{font:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:210px 1fr;min-height:100vh;transition:grid-template-columns .2s ease}
+.layout.collapsed{grid-template-columns:72px 1fr}
+.sidebar{background:var(--side);border-right:1px solid #2a2a2a;padding:18px 13px 16px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow:hidden auto}
+.brand-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:4px 0 26px;min-height:76px}
+.logo{flex:1;display:flex;justify-content:center;cursor:pointer;user-select:none}
+.logo img{width:104px;max-width:100%;height:auto;display:block}
+.logo-fallback{display:none;font:700 15px var(--mono);letter-spacing:3px;color:var(--orange)}
+.collapse{background:none;border:0;color:var(--orange);font:400 26px/1 var(--sans);padding:4px 8px;border-radius:3px}
+.collapse:hover{background:#1a1a1a}
+.layout.collapsed .collapse{transform:rotate(180deg)}
+.side-label{font-size:9px;letter-spacing:1.8px;color:#6b6b6b;padding:14px 12px 8px}
+
+/* nav buttons: same construction as the original demo (icon + label, rounded, inset accent, glow) */
+.nav{border:0;background:transparent;color:#d6d6d6;text-align:left;padding:11px 12px;border-radius:3px;display:flex;align-items:center;gap:11px;margin:2px 0;width:100%;font:600 12px/1.25 var(--sans);letter-spacing:.3px;text-transform:uppercase}
+.nav .ico{width:17px;text-align:center;color:var(--orange);font-size:15px;flex-shrink:0}
+.nav:hover{background:#171717;color:#fff}
+.nav.active{background:linear-gradient(90deg,var(--orange),var(--orange2));color:#fff;box-shadow:inset 3px 0 #ffb08a,0 0 18px #ff4f0033}
+.nav.active .ico{color:#fff}
+.nav .lbl{white-space:nowrap}
+.nav.active .lbl{font-size:10.5px;letter-spacing:0}
+.nav.active .lbl:before{content:"[ "}
+.nav.active .lbl:after{content:" ]"}
+.subnav{display:block;width:100%;text-align:left;background:none;border:0;color:#7d7d7d;font:400 10px var(--mono);padding:4px 12px 4px 40px;letter-spacing:.5px;text-transform:uppercase}
+.subnav:hover,.subnav.active{color:var(--orange)}
+.side-bottom{margin-top:auto;border-top:1px solid #222;padding:16px 8px 0;color:#6b6b6b;font-size:9px;letter-spacing:.6px}
+.user-chip{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+.avatar{width:30px;height:30px;border-radius:3px;background:var(--orange-soft);border:1px solid var(--orange2);display:grid;place-items:center;color:#ffd2bd;font:600 11px var(--mono);flex-shrink:0}
+.user-chip b{color:#d8d8d8;font-size:10px}
+.layout.collapsed .lbl,.layout.collapsed .side-label,.layout.collapsed .subnav,.layout.collapsed .side-bottom .meta,.layout.collapsed .user-chip div:last-child{display:none}
+.layout.collapsed .nav{justify-content:center;padding:12px 0}
+.layout.collapsed .nav.active .lbl{display:none}
+.layout.collapsed .logo img{width:44px}
+.layout.collapsed .brand-row{flex-direction:column;gap:12px}
+
+main{min-width:0;display:flex;flex-direction:column;min-height:100vh}
+
+/* ---------- page header band ---------- */
+.page{display:none;padding-bottom:12px}
+.page.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:.4}to{opacity:1}}
+.page-head{background:var(--band);padding:30px 42px 28px;margin:0 0 38px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:1px solid #2e2e2e}
+.eyebrow{font:300 17px/1.2 var(--mono);text-transform:uppercase;color:#d8d8d8;margin:0 0 6px}
+h1{font:600 clamp(22px,3.3vw,38px)/1.1 var(--mono);text-transform:uppercase;margin:0;letter-spacing:0;overflow-wrap:anywhere}
+h2{font:300 18px/1.2 var(--mono);text-transform:uppercase;letter-spacing:0;color:#b8b8b8;margin:0}
+h3{font-size:12px;margin:0 0 8px}
+.sub{color:var(--muted);font-size:11px;margin:10px 0 0}
+.tag{font:300 14px var(--mono);text-transform:uppercase;letter-spacing:0;padding:14px 22px;border:3px solid var(--orange);color:#fff;white-space:nowrap;background:transparent}
+.page > :not(.page-head){margin-left:42px;margin-right:42px}
+
+/* ---------- cards ---------- */
+.grid{display:grid;gap:30px}
+.stats{grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:38px}
+.cols{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start}
+.two{grid-template-columns:1.25fr .85fr;gap:24px}
+.three{grid-template-columns:repeat(3,1fr);gap:20px}
+.card{background:var(--panel);padding:20px 20px 22px;position:relative}
+.stat{min-height:146px}
+.stat-label{font:300 11px var(--mono);letter-spacing:.5px;text-transform:uppercase;color:#8d8d8d}
+.stat-num{font:600 clamp(30px,3.1vw,42px)/1 var(--mono);margin:16px 0 8px}
+.stat-note{font-size:11px;color:#6d6d6d}
+.panel-head{margin-bottom:16px}
+.panel-head h2{font-size:20px;color:#b4b4b4}
+.panel-head small{display:block;font:400 8px var(--mono);letter-spacing:1px;color:#6a6a6a;text-transform:uppercase;margin-top:5px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px}
+.text-link{color:var(--orange);background:none;border:0;font:400 10px var(--mono);padding:0;text-transform:uppercase}
+.text-link:hover{text-decoration:underline}
+
+/* dashboard lists */
+.ann-card{padding:22px 0}
+.ann-card .panel-head{padding:6px 22px 0}
+.ann{display:block;width:100%;text-align:left;background:#333;border:0;color:var(--text);padding:14px 20px 16px;margin:0 0 17px;border-radius:0;font:inherit}
+.ann:last-child{margin-bottom:0}
+button.ann:hover{background:#3b3b3b}
+.ann-date{display:block;font-size:12px;color:#b2b2b2;letter-spacing:1px;margin-bottom:8px;font-weight:300}
+.ann-text{display:block;font-size:11.5px;line-height:1.7;color:#f2f2f2}
+.task{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:14px 0;border-bottom:1px solid #9b9b9b66}
+.task:first-of-type{padding-top:2px}
+.task:last-child{border-bottom:0}
+.task-title{font-size:11px;font-weight:700;line-height:1.5;max-width:20ch}
+.task-meta{font-size:9px;color:#8e8e8e;margin-top:3px}
+.act{display:flex;gap:14px;align-items:center;padding:14px 0;border-bottom:1px solid #9b9b9b66}
+.act:first-of-type{padding-top:2px}
+.act:last-child{border-bottom:0}
+.act-time{width:38px;height:38px;flex-shrink:0;border:1px solid var(--orange);color:var(--orange);display:grid;place-items:center;font-size:9px}
+.act-text{font-size:10px;font-weight:700;line-height:1.5}
+
+/* ---------- generic content used by the other pages ---------- */
+.list{display:flex;flex-direction:column}
+.list-row{padding:13px 0;border-bottom:1px solid #2a2a2a;display:flex;gap:12px;align-items:flex-start}
+.list-row:last-child{border:0;padding-bottom:0}
+.datebox{width:40px;flex-shrink:0;background:#1d1d1d;text-align:center;padding:5px 2px;color:#b7b7b7;font-size:9px}
+.datebox b{display:block;font-size:16px;color:#fff}
+.row-main{flex:1;min-width:0}
+.row-title{font-size:12px;font-weight:700}
+.row-desc{font-size:10px;color:var(--muted);margin-top:3px}
+.pill{display:inline-block;border:1px solid #3a3a3a;padding:3px 7px;font-size:9px;color:#b5b5b5;border-radius:2px;white-space:nowrap}
+.pill.red{color:var(--red);border-color:#6b2e28;background:#2a1311}
+.pill.amber{color:var(--amber);border-color:#5e4a22;background:#241c0b}
+.pill.green{color:var(--green);border-color:#25563d;background:#0e2017}
+.notice{border-left:3px solid var(--orange);background:linear-gradient(90deg,#2a1608,#0c0c0c);padding:13px 15px;margin-bottom:14px}
+.notice.amber{border-color:var(--amber);background:linear-gradient(90deg,#2a2208,#0c0c0c)}
+.notice-title{font:600 11px var(--mono);margin-bottom:4px}
+.notice p{margin:0;color:#bdbdbd;font-size:11px}
+
+/* buttons: same construction as the original demo's .btn, recoloured */
+.btn{background:linear-gradient(135deg,#ff5a14,#b83300);border:1px solid #ff7a3d;color:#fff;box-shadow:0 0 15px #ff4f0033;padding:9px 13px;border-radius:3px;font:650 11px var(--sans);letter-spacing:.6px;text-transform:uppercase}
+.btn:hover{background:linear-gradient(135deg,#ff6e2e,#d43d00)}
+.btn.secondary{background:#160d08;border-color:#6b2f12;color:#ffd9c7;box-shadow:none}
+.btn.secondary:hover{background:#25130a;border-color:var(--orange)}
+.btn.ghost{background:transparent;border-color:#3a3a3a;color:#c4c4c4;box-shadow:none}
+.btn.small{padding:6px 9px;font-size:10px}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input,textarea,select{background:#0b0b0b;border:1px solid #333;color:var(--text);padding:10px 11px;border-radius:3px;width:100%;outline:none;font-size:12px}
+input:focus,textarea:focus,select:focus{border-color:var(--orange);box-shadow:0 0 0 2px #ff4f0026}
+textarea{min-height:125px;resize:vertical}
+label{display:block;color:#9a9a9a;font:300 10px var(--mono);letter-spacing:.5px;text-transform:uppercase;margin:13px 0 6px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 13px}
+.table-wrap{overflow:auto;background:#000}
+table{width:100%;border-collapse:collapse;min-width:580px}
+th{text-align:left;background:#1a1a1a;color:#9a9a9a;font:400 10px var(--mono);letter-spacing:.5px;text-transform:uppercase;padding:11px}
+td{padding:12px 11px;border-top:1px solid #222;font-size:11px;color:#cfcfcf}
+tr:hover td{background:#141414}
+.search{max-width:260px}
+.project-card{cursor:pointer;transition:border-color .15s,transform .15s;border:1px solid #1d1d1d}
+.project-card:hover{border-color:var(--orange)}
+.project-code{font-size:9px;color:var(--orange);letter-spacing:1.4px;margin-bottom:9px}
+.project-name{font:600 16px var(--mono);margin-bottom:5px}
+.project-meta{font-size:10px;color:var(--muted);margin-bottom:8px}
+.progress{height:4px;background:#2a2a2a;margin-top:13px;border-radius:3px;overflow:hidden}
+.progress span{display:block;height:100%;background:var(--orange)}
+.audio-row{display:grid;grid-template-columns:38px 1fr auto;gap:12px;align-items:center;padding:14px 0;border-bottom:1px solid #222}
+.play{height:34px;width:34px;border:1px solid var(--orange2);background:var(--orange-soft);color:#ffb08a;box-shadow:0 0 12px #ff4f0033;border-radius:50%}
+.play:hover{background:#4d1c05}
+.wave{height:24px;display:flex;align-items:center;gap:2px;margin-top:6px;opacity:.7}
+.wave i{display:block;width:3px;background:var(--orange);border-radius:3px}
+.hidden-file{display:none!important}
+.small-muted{color:#777;font-size:10px}
+.secret-hint{color:#555;font-size:9px;margin-top:12px}
+.footer{border-top:1px solid #262626;margin:auto 42px 0;padding:16px 0;color:#5e5e5e;font-size:9px;letter-spacing:1px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+main > .page + .page{margin-top:0}
+.modal-backdrop{position:fixed;inset:0;background:#000c;z-index:10;display:none;align-items:center;justify-content:center;padding:20px}
+.modal-backdrop.show{display:flex}
+.modal{background:#0b0b0b;border:1px solid var(--orange2);max-width:560px;width:100%;padding:23px;box-shadow:0 20px 70px #000}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal .eyebrow{font-size:11px;color:var(--orange);letter-spacing:1.5px}
+.close{background:none;border:0;color:#9a9a9a;font-size:22px}
+.toast{position:fixed;bottom:22px;right:22px;background:#140a05;border:1px solid var(--orange);padding:12px 16px;color:#ffe6d9;font-size:11px;display:none;z-index:20;box-shadow:0 8px 30px #000a}
+.toast.show{display:block}
+
+/* mouse sway (same idea as the login page); the header band stays put, its contents drift */
+.page > :not(.page-head),.page-head > *{transform:translate(var(--dx,0px),var(--dy,0px));will-change:transform}
+.pill.orange{color:#ff8a52;border-color:#7a2f0e;background:#2a1206}
+.lead{border:1px solid #1d1d1d}
+.lead-name{font:600 15px var(--mono);margin-bottom:6px}
+.lead-projects{font-size:11px;color:var(--muted);margin-bottom:12px}
+.locked-card{border:1px solid #3a1a0d}
+.lock-ico{width:34px;height:34px;display:grid;place-items:center;border:1px dashed #6b2f12;color:var(--orange)}
+.unlock{margin-top:18px;border-top:1px solid #222;padding-top:4px}
+
+/* ---------- divisions ---------- */
+.div-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:20px}
+.div-card{border:1px solid #1d1d1d;cursor:pointer;transition:border-color .15s,transform .15s;text-align:left;color:inherit;width:100%}
+.div-card:hover,.div-card:focus-visible{border-color:var(--orange);transform:translateY(-2px)}
+.div-card .div-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.div-card h2{margin:0 0 6px;font:700 15px/1.3 var(--sans);text-transform:uppercase;letter-spacing:.4px}
+.div-card .div-dir{font-size:11px;color:var(--muted)}
+.div-card.deco{cursor:default;opacity:.55}
+.div-card.deco:hover{border-color:#1d1d1d;transform:none}
+.div-gate{max-width:460px}
+.div-gate .toolbar{margin-top:6px;flex-wrap:nowrap}
+.div-err{min-height:18px;margin:10px 0 0;color:var(--red);font-size:11px}
+.div-shake{animation:lgshake .35s}
+.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;max-height:72vh;overflow-y:auto;padding:4px 10px 4px 0;scrollbar-width:thin;scrollbar-color:#3a3a3a #000}
+.gallery::-webkit-scrollbar{width:8px}
+.gallery::-webkit-scrollbar-track{background:#000}
+.gallery::-webkit-scrollbar-thumb{background:#3a3a3a;border-radius:4px}
+.gallery::-webkit-scrollbar-thumb:hover{background:var(--orange2)}
+@media(max-width:900px){.gallery{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.gallery{grid-template-columns:1fr}}
+.emp{background:var(--panel);border:1px solid #1d1d1d;padding:14px 14px 18px}
+.emp-photo{aspect-ratio:4/5;width:100%;background:#0b0b0b;border:1px dashed #3a3a3a;display:grid;place-items:center;overflow:hidden;margin-bottom:14px;color:#4a4a4a;font:600 34px var(--mono);letter-spacing:2px;position:relative}
+.emp-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.emp-photo small{position:absolute;bottom:8px;left:0;right:0;text-align:center;font:300 9px var(--mono);letter-spacing:1px;color:#555}
+.emp-name{font:700 15px var(--sans);margin:0 0 10px;text-transform:uppercase;letter-spacing:.4px}
+.emp-line{font-size:11px;color:#cfcfcf;margin:5px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.emp-line b{color:#8a8a8a;font-weight:400;min-width:48px}
+/* ---------- responsive ---------- */
+@media(max-width:1100px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.cols{grid-template-columns:1fr}.two{grid-template-columns:1fr}}
+@media(max-width:850px){
+  .layout,.layout.collapsed{grid-template-columns:1fr}
+  .sidebar{position:static;height:auto;flex-direction:row;align-items:center;overflow:auto;padding:8px;border-right:0;border-bottom:1px solid #2a2a2a;gap:2px}
+  .brand-row{margin:0 8px 0 0;min-height:0;flex-shrink:0}
+  .logo img{width:54px}
+  .collapse,.side-label,.side-bottom,.subnav{display:none}
+  .nav{width:auto;white-space:nowrap;padding:9px 10px}
+  .nav .ico{display:none}
+  .page-head{padding:22px 18px}
+  .page > :not(.page-head){margin-left:18px;margin-right:18px}
+  .footer{margin:auto 18px 0}
+  .tag{padding:8px 12px;font-size:13px}
+}
+@media(max-width:560px){
+  .page-head{flex-direction:column}
+  .stats{gap:12px}
+  .form-grid,.three{grid-template-columns:1fr}
+  .audio-row{grid-template-columns:38px 1fr}
+  .audio-row .pill{grid-column:2;justify-self:start}
+}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ================= LOGIN SCREEN (scoped so it can't affect the app) ================= */
+body.locked{overflow:hidden}
+#loginScreen{
+  --l-bg:#000;--l-text:#fff;--l-muted:#6b6b6b;--l-line:#3a3a3a;--l-error:#ff6b6b;
+  position:fixed;inset:0;z-index:1000;background:var(--l-bg);color:var(--l-text);
+  font-family:"Courier New",Courier,monospace;font-size:16px;line-height:normal;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+#loginScreen.gone{display:none}
+#loginScreen .lg-main{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px}
+#loginScreen .logo-wrap{display:flex;align-items:center;justify-content:center;min-height:90px}
+#loginScreen .logo-wrap img{max-width:min(320px,70vw);max-height:120px;display:block}
+#loginScreen .logo-placeholder{width:240px;height:80px;border:1px dashed var(--l-line);display:flex;align-items:center;justify-content:center;color:var(--l-muted);letter-spacing:.3em;font-size:13px}
+#loginScreen form{width:min(540px,100%);display:flex;flex-direction:column;gap:12px}
+#loginScreen .row{display:flex;border:1px solid var(--l-line);background:rgba(0,0,0,.55)}
+#loginScreen .row input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--l-text);font:inherit;font-size:20px;letter-spacing:.08em;padding:20px 26px}
+#loginScreen .row input::placeholder{color:var(--l-muted)}
+#loginScreen .row:focus-within{border-color:#8a8a8a}
+#loginScreen button{background:transparent;color:#cfcfcf;font:inherit;font-size:16px;letter-spacing:.25em;text-transform:uppercase;border:1px solid var(--l-line);padding:20px 26px;cursor:pointer}
+#loginScreen button:hover,#loginScreen button:focus-visible{background:#fff;color:#000;outline:0}
+#loginScreen #msg{min-height:20px;margin:0;text-align:center;font-size:14px;color:var(--l-error);letter-spacing:.1em}
+#loginScreen .shake{animation:lgshake .35s}
+@keyframes lgshake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+#loginScreen .lg-footer{position:relative;z-index:1;border-top:1px solid #1a1a1a;text-align:center;padding:18px;font-size:12px;letter-spacing:.2em;color:#3d3d3d}
+@media (prefers-reduced-motion:reduce){#loginScreen .shake{animation:none}}
+</style>
+</head>
+<body class="locked">
+<!-- ================= LOGIN SCREEN ================= -->
+<div id="loginScreen">
+  <div class="lg-main" id="loginMain">
+    <div class="logo-wrap" id="logoWrap"><div class="logo-placeholder">YOUR LOGO</div></div>
+    <form id="loginForm" autocomplete="off">
+      <div class="row"><input id="admin" type="text" placeholder="enter admin name" autocapitalize="none" spellcheck="false" required></div>
+      <div class="row">
+        <input id="pass" type="password" placeholder="enter password" required>
+        <button type="submit">Submit</button>
+      </div>
+      <p id="msg" role="alert"></p>
+    </form>
+  </div>
+  <div class="lg-footer">© 2026 Noughts Organization. All rights reserved.</div>
+</div>
+
+<!-- ================= INTERNAL NETWORK (hidden until login) ================= -->
+<div id="appRoot" hidden>
+<div class="layout" id="layout">
+<aside class="sidebar">
+  <div class="brand-row">
+    <div class="logo" id="logoMark" title="Noughts">
+      <img src="https://i.postimg.cc/8PVxFCdV/noughts-org.png" alt="Noughts" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+      <span class="logo-fallback">NOUGHTS</span>
+    </div>
+    <button class="collapse" id="collapseBtn" aria-label="Collapse sidebar" aria-expanded="true">&lt;</button>
+  </div>
+
+  <div class="side-label">WORKSPACE</div>
+  <button class="nav active" data-page="dashboard"><span class="ico">▦</span><span class="lbl">Dashboard</span></button>
+  <button class="nav" data-page="attendance"><span class="ico">◷</span><span class="lbl">Employee check in</span></button>
+  <button class="nav" data-page="projects"><span class="ico">▤</span><span class="lbl">Project registry</span></button>
+  <button class="nav" data-page="announcements"><span class="ico">▣</span><span class="lbl">Announcements</span></button>
+  <button class="nav" data-page="divisions"><span class="ico">◈</span><span class="lbl">Divisions</span></button>
+
+  <div class="side-label">RECORDS</div>
+  <button class="nav" data-pages="audio documents"><span class="ico">▧</span><span class="lbl">Archives</span></button>
+  <button class="subnav" data-page="audio">&gt; Audio</button>
+  <button class="subnav" data-page="documents">&gt; Document</button>
+  <button class="nav" data-page="reports"><span class="ico">✎</span><span class="lbl">Reports</span></button>
+
+  <div class="side-bottom">
+    <div class="user-chip"><div class="avatar">EL</div><div><b>ELIN</b><br><span>Valieva's division</span></div></div>
+    <span class="meta">VERSION 1.0.0</span>
+  </div>
+</aside>
+
+<main>
+<section class="page active" id="dashboard">
+  <div class="page-head"><div><div class="eyebrow">Dashboard</div><h1>Welcome back, Elin</h1></div><span class="tag">Clearance [ASST.]</span></div>
+
+  <div class="grid stats">
+    <div class="card stat"><div class="stat-label">Active projects</div><div class="stat-num">01</div><div class="stat-note">1 waiting review</div></div>
+    <div class="card stat"><div class="stat-label">Active employees</div><div class="stat-num" id="staffCount">1,237</div><div class="stat-note">across all divisions</div></div>
+    <div class="card stat"><div class="stat-label">Pending reports</div><div class="stat-num" id="reportCount">10</div><div class="stat-note" id="localTime">last updated</div></div>
+    <div class="card stat"><div class="stat-label">New archive items</div><div class="stat-num">03</div><div class="stat-note">since your last session</div></div>
+  </div>
+
+  <div class="grid cols">
+    <div class="card ann-card">
+      <div class="panel-head"><h2>Announcements</h2><small><button class="text-link" onclick="showPage('announcements')">&gt; View all</button></small></div>
+      <button class="ann" onclick="showPage('announcements')"><span class="ann-date">09. 11. 2026</span><span class="ann-text">Project Jaden has currently concluded and was a success. The project is led by the division of Director Valieva.</span></button>
+      <button class="ann" onclick="showPage('announcements')"><span class="ann-date">24. 10. 2026</span><span class="ann-text">Project LS is currently going under severe rechecks as reported with errors.</span></button>
+      <button class="ann" onclick="showPage('announcements')"><span class="ann-date">15. 09. 2026</span><span class="ann-text">Division B is currently going under maintenance. Employees under Director Viktor of Division B may move temporarily...</span></button>
+      <button class="ann" onclick="showPage('announcements')"><span class="ann-date">06. 09. 2026</span><span class="ann-text">The policy about handling reports and projects has been updated, this essentially helps for better management and...</span></button>
+    </div>
+
+    <div class="card">
+      <div class="panel-head"><h2>Tasks</h2><small>&gt; 4 total</small></div>
+      <div class="task"><div><div class="task-title">Weekly Attendance Confirmation</div><div class="task-meta">Due today – Valieva's Office</div></div><button class="btn small secondary" onclick="showPage('attendance')">Open</button></div>
+      <div class="task"><div><div class="task-title">Project LS evaluation</div><div class="task-meta">Due December 01st – Research Facility</div></div><button class="btn small secondary" onclick="showPage('reports')">Open</button></div>
+      <div class="task"><div><div class="task-title">Reviewing and Confirming Interns</div><div class="task-meta">Due December 09th</div></div><button class="btn small secondary" onclick="showPage('attendance')">Open</button></div>
+      <div class="task"><div><div class="task-title">Archives Confirmation</div><div class="task-meta">New documents uploaded</div></div><button class="btn small secondary" onclick="showPage('documents')">Open</button></div>
+    </div>
+
+    <div class="card">
+      <div class="panel-head"><h2>Recent system activity</h2><small>&gt; Currents</small></div>
+      <div class="act"><div class="act-time">19:23</div><div class="act-text">Project Jaden Updated</div></div>
+      <div class="act"><div class="act-time">18:40</div><div class="act-text">Report submitted</div></div>
+      <div class="act"><div class="act-time">16:40</div><div class="act-text">Audio record LS-0002 added to archive</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="attendance">
+  <div class="page-head"><div><div class="eyebrow">Employee check in</div><h1>Attendance</h1></div></div>
+  <div class="grid two">
+    <div class="card">
+      <h2>Check in</h2>
+      <div class="notice amber" style="margin-top:16px"><div class="notice-title">REMINDER</div><p>Confirm your attendance at the start of every shift.</p></div>
+      <div class="form-grid">
+        <div><label>Employee name</label><input value="Elin" readonly></div>
+        <div><label>Employee ID</label><input value="NO-2048" readonly></div>
+        <div><label>Division</label><input value="Director Valieva" readonly></div>
+        <div><label>Facility</label><input value="Research Facility" readonly></div>
+      </div>
+      <label>Shift status</label>
+      <select id="shiftStatus"><option>On site</option><option>Remote assignment</option><option>On approved leave</option></select>
+      <label>Note (optional)</label>
+      <input id="attendanceNote" placeholder="Add a short note...">
+      <div style="margin-top:18px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="checkIn()">Confirm check in</button><button class="btn secondary" onclick="checkOut()">Check out</button></div>
+      <p class="small-muted" id="attendanceMessage" style="margin-top:14px">No check in recorded this session.</p>
+    </div>
+    <div class="card">
+      <h2>Recent attendance</h2>
+      <div class="table-wrap" style="margin-top:16px"><table><thead><tr><th>Date</th><th>Status</th><th>Time</th></tr></thead><tbody id="attendanceRows">
+        <tr><td>09 NOV</td><td><span class="pill green">ON SITE</span></td><td>08:57</td></tr>
+        <tr><td>08 NOV</td><td><span class="pill green">ON SITE</span></td><td>09:02</td></tr>
+        <tr><td>07 NOV</td><td><span class="pill">REMOTE</span></td><td>09:11</td></tr>
+      </tbody></table></div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="projects">
+  <div class="page-head"><div><div class="eyebrow">Project registry</div><h1>Projects</h1></div></div>
+  <div class="toolbar" style="margin-bottom:18px">
+    <input class="search" id="projectSearch" placeholder="Search projects..." oninput="filterProjects()">
+    <select style="max-width:170px" id="projectFilter" onchange="filterProjects()"><option value="all">All statuses</option><option>On-going</option><option>Completed</option><option>Under review</option></select>
+  </div>
+  <div class="grid three" id="projectGrid">
+    <div class="card project-card" data-name="Project LS" data-status="On-going" onclick="openProject('PROJECT LS','PRJ-LS','On-going','Currently going under severe rechecks after errors were reported.','Director Valieva, Director Yeva')">
+      <div class="project-code">PRJ-LS</div><div class="project-name">Project LS</div>
+      <div class="project-meta">Leads: Director Valieva, Director Yeva</div><span class="pill orange">ON-GOING</span>
+    </div>
+    <div class="card project-card" data-name="Project Jaden" data-status="Completed" onclick="openProject('PROJECT JADEN','PRJ-JADEN','Completed','Concluded and marked a success. Led by the division of Director Valieva.','Director Valieva')">
+      <div class="project-code">PRJ-JADEN</div><div class="project-name">Project Jaden</div>
+      <div class="project-meta">Lead: Director Valieva</div><span class="pill green">COMPLETED</span>
+    </div>
+    <div class="card project-card" data-name="Project Inference" data-status="Under review" onclick="openProject('PROJECT INFERENCE','PRJ-INF','Under review','Waiting on review. Shared between all three divisions.','Director Valieva, Director Yeva, Director Viktor')">
+      <div class="project-code">PRJ-INF</div><div class="project-name">Project Inference</div>
+      <div class="project-meta">Leads: Director Valieva, Director Yeva, Director Viktor</div><span class="pill amber">UNDER REVIEW</span>
+    </div>
+  </div>
+
+  <div class="section-head" style="margin-top:40px;margin-bottom:14px"><h2>Leads</h2></div>
+  <div class="grid three">
+    <div class="card lead"><div class="lead-name">Director Valieva</div><div class="lead-projects">LS · Jaden · Inference</div><span class="pill orange">YOUR DIVISION</span></div>
+    <div class="card lead"><div class="lead-name">Director Yeva</div><div class="lead-projects">LS · Inference</div></div>
+    <div class="card lead"><div class="lead-name">Director Viktor</div><div class="lead-projects">Inference</div></div>
+  </div>
+</section>
+
+<section class="page" id="announcements">
+  <div class="page-head"><div><div class="eyebrow">Announcements</div><h1>Important notices</h1></div></div>
+  <div class="notice"><div class="notice-title">IMPORTANT</div><p>Project LS evaluation is due December 01st. Interns must be reviewed and confirmed by December 09th.</p></div>
+  <div class="card ann-card">
+    <div class="ann-list">
+      <div class="ann"><span class="ann-date">09. 11. 2026</span><span class="ann-text">Project Jaden has currently concluded and was a success. The project is led by the division of Director Valieva.</span></div>
+      <div class="ann"><span class="ann-date">24. 10. 2026</span><span class="ann-text">Project LS is currently going under severe rechecks as reported with errors.</span></div>
+      <div class="ann"><span class="ann-date">15. 09. 2026</span><span class="ann-text">Division B is currently going under maintenance. Employees under Director Viktor of Division B may move temporarily...</span></div>
+      <div class="ann"><span class="ann-date">06. 09. 2026</span><span class="ann-text">The policy about handling reports and projects has been updated, this essentially helps for better management and...</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="divisions">
+  <div class="page-head"><div><div class="eyebrow">Workspace</div><h1>Divisions</h1></div></div>
+
+  <div id="divList" class="div-grid"></div>
+
+  <div id="divGate" class="hidden-file">
+    <button class="btn ghost small" type="button" onclick="divBack()">&lt; Back to divisions</button>
+    <div class="card div-gate" style="margin-top:18px">
+      <div class="eyebrow" id="gateName" style="font-size:13px"></div>
+      <p class="small-muted" id="gateDir" style="margin:4px 0 8px"></p>
+      <label for="divPass">Division password</label>
+      <div class="toolbar">
+        <input id="divPass" type="password" autocomplete="off" placeholder="Enter password" onkeydown="if(event.key==='Enter')divUnlock()">
+        <button class="btn" type="button" onclick="divUnlock()">Enter</button>
+      </div>
+      <p class="div-err" id="divErr" role="alert"></p>
+    </div>
+  </div>
+
+  <div id="divGallery" class="hidden-file">
+    <div class="toolbar" style="justify-content:space-between;margin-bottom:22px">
+      <button class="btn ghost small" type="button" onclick="divBack()">&lt; Back to divisions</button>
+      <span class="small-muted" id="galleryCount"></span>
+    </div>
+    <h2 id="galleryTitle" style="margin:0 0 4px"></h2>
+    <p class="small-muted" id="galleryDir" style="margin:0 0 24px"></p>
+    <div class="gallery" id="galleryGrid"></div>
+  </div>
+</section>
+
+<section class="page" id="audio">
+  <div class="page-head"><div><div class="eyebrow">Archives</div><h1>Audio logs</h1></div></div>
+  <div class="card">
+    <div class="toolbar" style="justify-content:space-between;margin-bottom:6px"><h2>Available logs</h2><input class="search" id="audioSearch" placeholder="Search audio logs..." oninput="filterAudio()"></div>
+    <div id="audioList"></div>
+    <p class="small-muted" id="audioMessage" style="margin-top:14px">Select a log to play it.</p>
+  </div>
+
+  <div class="card locked-card" style="margin-top:24px">
+    <button class="btn" id="lockBtn" onclick="toggleLock()">Other audio logs</button>
+    <div class="unlock hidden-file" id="unlockBox">
+      <label for="lockPass">Passcode</label>
+      <div class="toolbar">
+        <input id="lockPass" type="password" autocomplete="off" placeholder="Enter passcode" style="max-width:260px" onkeydown="if(event.key==='Enter')unlockAudio()">
+        <button class="btn secondary" onclick="unlockAudio()">Unlock</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="page" id="documents">
+  <div class="page-head"><div><div class="eyebrow">Archives</div><h1>Documents</h1></div></div>
+  <div class="toolbar" style="margin-bottom:16px">
+    <input class="search" id="docSearch" placeholder="Search documents..." oninput="filterDocs()">
+    <select style="max-width:180px" id="docType" onchange="filterDocs()"><option value="all">All types</option><option>Memorandum</option><option>Project report</option></select>
+  </div>
+  <div class="table-wrap"><table id="docTable"><thead><tr><th>ID</th><th>Title</th><th>Type</th><th>Date</th><th>Access</th></tr></thead><tbody>
+    <tr data-type="Memorandum"><td>MEM-1106</td><td>Reporting requirements, all divisions</td><td>Memorandum</td><td>10 NOV 2026</td><td><span class="pill green">ASST.</span></td></tr>
+    <tr data-type="Project report"><td>PRJ-JADEN-F</td><td>Jaden final report</td><td>Project report</td><td>09 NOV 2026</td><td><span class="pill green">ASST.</span></td></tr>
+    <tr data-type="Project report"><td>PRJ-LS-R3</td><td>LS recheck summary</td><td>Project report</td><td>24 OCT 2026</td><td><span class="pill green">ASST.</span></td></tr>
+    <tr data-type="Project report"><td>PRJ-INF-01</td><td>Inference review file</td><td>Project report</td><td>—</td><td><span class="pill red">RESTRICTED</span></td></tr>
+    <tr data-type="Memorandum"><td>MEM-0906</td><td>Handling reports and projects</td><td>Memorandum</td><td>06 SEP 2026</td><td><span class="pill green">ASST.</span></td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="page hidden-file" id="unlisted">
+  <div class="page-head"><div><div class="eyebrow">Unindexed</div><h1>Audio record</h1></div><span class="tag">UNVERIFIED</span></div>
+  <div class="card">
+    <div class="notice"><div class="notice-title">METADATA CONFLICT</div><p>Record AR-0000 has no source division. The timestamp is older than the archive system.</p></div>
+    <div class="project-code">AR-0000 · RECOVERED FROM LEGACY INDEX</div>
+    <h2 style="margin-bottom:12px">Transcript fragment</h2>
+    <p style="color:#c4c4c4;font-size:12px;line-height:2;margin:0">[00:00:04] — Is this line still recording?<br>[00:00:09] — They said the project was closed.<br>[00:00:14] — Then why is the review scheduled for tomorrow?<br>[00:00:19] — ...<br>[00:00:23] — Don't put my name in the report.</p>
+    <p class="small-muted" style="margin-top:12px">End of available transcript. No audio attached.</p>
+  </div>
+</section>
+
+<section class="page" id="reports">
+  <div class="page-head"><div><div class="eyebrow">Reports</div><h1>Reports</h1></div></div>
+  <div class="grid two">
+    <div class="card"><h2>New report</h2>
+      <label>Project</label><select id="reportProject"><option>Project LS</option><option>Project Jaden</option><option>Project Inference</option></select>
+      <div class="form-grid"><div><label>Type</label><select id="reportType"><option>Progress evaluation</option><option>Incident summary</option><option>Administrative review</option><option>Research observation</option></select></div><div><label>Priority</label><select id="reportPriority"><option>Normal</option><option>High</option><option>Urgent</option></select></div></div>
+      <label>Title</label><input id="reportTitle" placeholder="Report title">
+      <label>Findings</label><textarea id="reportBody" placeholder="Write your observations and recommendations..."></textarea>
+      <div style="display:flex;justify-content:flex-end;margin-top:14px"><button class="btn" onclick="submitReport()">Submit report</button></div>
+    </div>
+    <div class="card"><div class="section-head"><h2>Recent reports</h2><span class="pill" id="reportTotal">04 RECORDS</span></div><div class="list" id="reportList">
+      <div class="list-row"><div class="row-main"><div class="row-title">PR-0290 · Inference review notes</div><div class="row-desc">Director Viktor's division · 10 Nov 2026</div></div><span class="pill amber">PENDING</span></div>
+      <div class="list-row"><div class="row-main"><div class="row-title">PR-0289 · Jaden final report</div><div class="row-desc">Elin · 09 Nov 2026</div></div><span class="pill green">ACCEPTED</span></div>
+      <div class="list-row"><div class="row-main"><div class="row-title">PR-0288 · LS recheck log</div><div class="row-desc">Director Yeva's division · 24 Oct 2026</div></div><span class="pill amber">PENDING</span></div>
+      <div class="list-row"><div class="row-main"><div class="row-title">PR-0287 · LS error report</div><div class="row-desc">Director Valieva's division · 20 Oct 2026</div></div><span class="pill green">ACCEPTED</span></div>
+    </div></div>
+  </div>
+</section>
+
+
+<div class="footer"><span>NOUGHTS · INTERNAL NETWORK</span><span>VERSION 1.0.0</span></div>
+</main>
+</div>
+
+<div class="modal-backdrop" id="modal" onclick="if(event.target===this)closeModal()"><div class="modal"><div class="modal-head"><div><div class="eyebrow">PROJECT RECORD</div><h2 id="modalTitle">Project</h2></div><button class="close" onclick="closeModal()" aria-label="Close">×</button></div><div id="modalContent"></div><div style="margin-top:18px;display:flex;gap:8px"><button class="btn" onclick="closeModal();showPage('reports')">Write evaluation</button><button class="btn secondary" onclick="closeModal()">Close</button></div></div></div>
+<div class="toast" id="toast"></div>
+</div><!-- /appRoot -->
+
+<script>
+/* =====================================================================
+   EDIT THESE
+   ===================================================================== */
+
+/* Audio logs. To add an mp3, put the file next to this html file (or in a
+   folder like audio/) and set "file" to its path, e.g. file:'audio/ls-0003.mp3'.
+   Leave file:'' and the log shows "no audio attached yet". */
+const AUDIO_LOGS=[
+  {id:'LS-0000',title:'Project LS, log 0',date:'—',source:'Research Facility',file:'',transcript:false},
+  {id:'LS-0001',title:'Project LS, log 1',date:'—',source:'Research Facility',file:'',transcript:false},
+  {id:'LS-0002',title:'Project LS, log 2',date:'—',source:'Research Facility',file:'',transcript:false}
+];
+
+/* Passcode for the locked audio logs button (anyone can read this in the source). */
+const LOCKED_AUDIO_PASSCODE='0000';
+
+/* Google Drive link opened after the correct passcode. Replace with your link. */
+const LOCKED_AUDIO_DRIVE_LINK='https://drive.google.com/drive/folders/REPLACE_WITH_YOUR_LINK';
+
+/* =====================================================================
+   DIVISIONS  (EDIT THESE)
+   - deco:true = display only (not clickable, no password, no gallery).
+   - password: what a person must type to open that division (readable in the source).
+   - image: paste an image link between the quotes ('https://...'). Leave '' for a blank placeholder.
+   - To add someone, copy one { ... } line inside that division's "members" list.
+   ===================================================================== */
+const DIVISIONS=[
+  {id:'tech',name:'Tech & Research Division',director:'Director Valieva',password:'tech1234test',members:[
+    {name:'Elin',image:'',status:'ACTIVE',rank:'A (asst.)',roles:'Manager'},
+    {name:'Eliot',image:'',status:'ACTIVE',rank:'B',roles:'Tech and Research'},
+    {name:'Sonje',image:'',status:'ACTIVE',rank:'A (second asst.)',roles:'Supervisor'},
+    {name:'Alanna',image:'',status:'ACTIVE',rank:'C+',roles:'Tech and Research'},
+    {name:'Ayra',image:'',status:'ACTIVE',rank:'B-',roles:'Tech and Research + Support'},
+    {name:'Ernesta',image:'',status:'ACTIVE',rank:'D (intern)',roles:'Tech and Research + Support'}
+  ]},
+  {id:'exp',name:'Experiments and Scientific Division',director:'Director Viktor',deco:true,members:[]},
+  {id:'command',name:'Command Division',director:'Director Yeva',deco:true,members:[]},
+  {id:'enforce',name:'Enforcement Division',director:'Director Michael',deco:true,members:[]},
+  {id:'finance',name:'Finance & Front Operations Division',director:'Director Kyle',deco:true,members:[]}
+];
+
+/* Mouse sway: how far the page content drifts with the cursor (px) and how floaty it feels. */
+const SWAY=14;   // max movement in px (0 = no movement)
+const EASE=0.08; // lower = floatier
+
+/* ===================================================================== */
+
+const navButtons=[...document.querySelectorAll('.nav,.subnav')];
+function showPage(id){
+ document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+ const page=document.getElementById(id); if(page) page.classList.add('active');
+ navButtons.forEach(b=>b.classList.toggle('active',(b.dataset.pages||b.dataset.page).split(' ').includes(id)));
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+navButtons.forEach(b=>b.addEventListener('click',()=>showPage((b.dataset.pages||b.dataset.page).split(' ')[0])));
+const layoutEl=document.getElementById('layout'),collapseBtn=document.getElementById('collapseBtn');
+collapseBtn.addEventListener('click',()=>{const c=layoutEl.classList.toggle('collapsed');collapseBtn.setAttribute('aria-expanded',String(!c));collapseBtn.setAttribute('aria-label',c?'Expand sidebar':'Collapse sidebar')});
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2600)}
+function escapeHTML(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+/* ---------- attendance ---------- */
+function checkIn(){
+ const status=document.getElementById('shiftStatus').value;
+ const note=document.getElementById('attendanceNote').value;
+ const now=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+ document.getElementById('attendanceMessage').textContent=`Check in recorded at ${now} · ${status}${note?' · '+note:''}`;
+ const row=document.createElement('tr');row.innerHTML=`<td>TODAY</td><td><span class="pill green">${escapeHTML(status.toUpperCase())}</span></td><td>${now}</td>`;
+ document.getElementById('attendanceRows').prepend(row);toast('Check in recorded.');
+}
+function checkOut(){const now=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});document.getElementById('attendanceMessage').textContent=`Check out recorded at ${now}.`;toast('Check out recorded.')}
+
+/* ---------- projects ---------- */
+function filterProjects(){
+ const q=document.getElementById('projectSearch').value.toLowerCase(),s=document.getElementById('projectFilter').value;
+ document.querySelectorAll('#projectGrid .project-card').forEach(c=>c.style.display=(c.dataset.name.toLowerCase().includes(q)&&(s==='all'||c.dataset.status===s))?'block':'none');
+}
+function openProject(name,id,status,summary,leads){
+ document.getElementById('modalTitle').textContent=name;
+ document.getElementById('modalContent').innerHTML=`<div class="form-grid"><div><label>Project ID</label><p>${id}</p></div><div><label>Status</label><p>${status}</p></div></div><label>Leads</label><p>${leads}</p><label>Summary</label><p style="color:#bdbdbd;font-size:12px;line-height:1.7">${summary}</p>`;
+ document.getElementById('modal').classList.add('show');
+}
+function closeModal(){document.getElementById('modal').classList.remove('show')}
+
+/* ---------- reports ---------- */
+let reportNo=291;
+function submitReport(){
+ const project=document.getElementById('reportProject').value,title=document.getElementById('reportTitle').value.trim(),body=document.getElementById('reportBody').value.trim();
+ if(!title||!body){toast('Enter a title and your findings first.');return}
+ const id='PR-'+String(reportNo++).padStart(4,'0');
+ const item=document.createElement('div');item.className='list-row';
+ item.innerHTML=`<div class="row-main"><div class="row-title">${id} · ${escapeHTML(title)}</div><div class="row-desc">Elin · ${new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})} · ${escapeHTML(project)}</div></div><span class="pill amber">PENDING</span>`;
+ document.getElementById('reportList').prepend(item);
+ document.getElementById('reportCount').textContent=String(Number(document.getElementById('reportCount').textContent)+1).padStart(2,'0');
+ document.getElementById('reportTotal').textContent=String(document.getElementById('reportList').children.length).padStart(2,'0')+' RECORDS';
+ document.getElementById('reportTitle').value='';document.getElementById('reportBody').value='';
+ toast('Report submitted. Reference: '+id);
+}
+
+/* ---------- documents ---------- */
+function filterDocs(){const q=document.getElementById('docSearch').value.toLowerCase(),t=document.getElementById('docType').value;document.querySelectorAll('#docTable tbody tr').forEach(r=>r.style.display=(r.innerText.toLowerCase().includes(q)&&(t==='all'||r.dataset.type===t))?'':'none')}
+
+/* ---------- audio ---------- */
+function renderAudio(){
+ document.getElementById('audioList').innerHTML=AUDIO_LOGS.map(l=>`
+  <div class="audio-row" data-search="${escapeHTML((l.id+' '+l.title+' '+l.source).toLowerCase())}">
+   <button class="play" data-id="${escapeHTML(l.id)}" aria-label="Play ${escapeHTML(l.id)}">▶</button>
+   <div><div class="row-title">${escapeHTML(l.id)} · ${escapeHTML(l.title)}</div><div class="row-desc">${escapeHTML(l.date)} · ${escapeHTML(l.source)}</div></div>
+   <span class="pill ${l.transcript?'green':''}">${l.transcript?'TRANSCRIPT':'NO TRANSCRIPT'}</span>
+  </div>`).join('');
+ document.querySelectorAll('#audioList .play').forEach(b=>b.addEventListener('click',()=>playLog(b.dataset.id,b)));
+}
+function filterAudio(){const q=document.getElementById('audioSearch').value.toLowerCase();document.querySelectorAll('#audioList .audio-row').forEach(r=>r.style.display=r.dataset.search.includes(q)?'grid':'none')}
+let currentAudio=null,currentId=null;
+function playLog(id,btn){
+ const log=AUDIO_LOGS.find(l=>l.id===id),msg=document.getElementById('audioMessage');
+ if(currentAudio&&currentId===id&&!currentAudio.paused){currentAudio.pause();btn.textContent='▶';return}
+ if(currentAudio)currentAudio.pause();
+ document.querySelectorAll('.play').forEach(b=>b.textContent='▶');
+ if(!log.file){msg.textContent=id+' · No audio attached yet.';return}
+ currentAudio=new Audio(log.file);currentId=id;
+ currentAudio.onended=()=>{btn.textContent='▶'};
+ currentAudio.play().then(()=>{btn.textContent='Ⅱ';msg.textContent='Playing '+id}).catch(()=>{msg.textContent=id+' · Could not load '+log.file})
+}
+function toggleLock(){
+ const b=document.getElementById('unlockBox');b.classList.toggle('hidden-file');
+ if(!b.classList.contains('hidden-file'))document.getElementById('lockPass').focus();
+}
+function unlockAudio(){
+ const i=document.getElementById('lockPass');
+ if(i.value.trim()===LOCKED_AUDIO_PASSCODE){
+  i.value='';toast('Passcode accepted.');
+  window.open(LOCKED_AUDIO_DRIVE_LINK,'_blank','noopener');
+ }else{toast('Wrong passcode.');i.select()}
+}
+renderAudio();
+
+/* ---------- Divisions ---------- */
+const divUnlocked=new Set();let divCurrent=null;
+const divEl=id=>document.getElementById(id);
+function divView(v){['divList','divGate','divGallery'].forEach(x=>divEl(x).classList.toggle('hidden-file',x!==v))}
+function renderDivList(){
+ divEl('divList').innerHTML=DIVISIONS.map(d=>{
+  if(d.deco)return `<div class="card div-card deco"><div class="div-top"><div><h2>${escapeHTML(d.name)}</h2><div class="div-dir">${escapeHTML(d.director)}</div></div><div class="lock-ico">◆</div></div><span class="pill">RESTRICTED</span></div>`;
+  return `<button type="button" class="card div-card" data-div="${d.id}"><div class="div-top"><div><h2>${escapeHTML(d.name)}</h2><div class="div-dir">${escapeHTML(d.director)}</div></div><div class="lock-ico">${divUnlocked.has(d.id)?'◇':'◆'}</div></div><span class="pill ${divUnlocked.has(d.id)?'green':''}">${divUnlocked.has(d.id)?'UNLOCKED':'PASSWORD REQUIRED'}</span></button>`;
+ }).join('');
+ divEl('divList').querySelectorAll('[data-div]').forEach(b=>b.addEventListener('click',()=>divOpen(b.dataset.div)));
+}
+function divOpen(id){
+ divCurrent=DIVISIONS.find(d=>d.id===id);if(!divCurrent||divCurrent.deco)return;
+ if(divUnlocked.has(id)){showGallery();return}
+ divEl('gateName').textContent=divCurrent.name;divEl('gateDir').textContent=divCurrent.director;
+ divEl('divPass').value='';divEl('divErr').textContent='';divView('divGate');divEl('divPass').focus();
+}
+function divUnlock(){
+ if(!divCurrent)return;
+ const v=divEl('divPass').value.replace(/\s+/g,'');
+ if(v&&v===divCurrent.password.replace(/\s+/g,'')){divUnlocked.add(divCurrent.id);showGallery()}
+ else{
+  divEl('divErr').textContent='Wrong password.';
+  const g=document.querySelector('.div-gate');g.classList.remove('div-shake');void g.offsetWidth;g.classList.add('div-shake');
+ }
+}
+function showGallery(){
+ const d=divCurrent;
+ divEl('galleryTitle').textContent=d.name;divEl('galleryDir').textContent=d.director;
+ divEl('galleryCount').textContent=d.members.length+(d.members.length===1?' member':' members');
+ const grid=divEl('galleryGrid');
+ grid.innerHTML=d.members.length?d.members.map(m=>{
+  const ini=escapeHTML(m.name.slice(0,2).toUpperCase());
+  const photo=m.image?`<img src="${escapeHTML(m.image)}" alt="${escapeHTML(m.name)}" onerror="this.replaceWith(document.createTextNode(this.alt.slice(0,2).toUpperCase()))">`:`${ini}<small>INSERT IMAGE LINK</small>`;
+  const st=String(m.status||'').toUpperCase();
+  return `<div class="emp"><div class="emp-photo">${photo}</div><h3 class="emp-name">${escapeHTML(m.name)}</h3><div class="emp-line"><b>Status:</b><span class="pill ${st==='ACTIVE'?'green':'amber'}">${escapeHTML(st)}</span></div><div class="emp-line"><b>Rank:</b>${escapeHTML(m.rank)}</div><div class="emp-line"><b>Roles:</b>${escapeHTML(m.roles)}</div></div>`;
+ }).join(''):'<p class="small-muted">No personnel listed for this division yet.</p>';
+ divView('divGallery');renderDivList();
+}
+function divBack(){divCurrent=null;divView('divList');renderDivList()}
+renderDivList();
+
+/* Five clicks on the logo open an unindexed record (ARG clue). */
+let logoClicks=0,logoTimer;
+document.getElementById('logoMark').addEventListener('click',()=>{
+ logoClicks++;clearTimeout(logoTimer);logoTimer=setTimeout(()=>logoClicks=0,1800);
+ if(logoClicks>=5){logoClicks=0;document.getElementById('unlisted').classList.remove('hidden-file');showPage('unlisted');toast('Unindexed record opened.');}
+});
+
+/* "Last updated" shows the viewer's own current time, in their own timezone. */
+function updateLocalTime(){
+ const t=new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
+ document.getElementById('localTime').textContent='last updated '+t;
+}
+updateLocalTime();setInterval(updateLocalTime,30000);
+
+/* ---------- mouse sway ---------- */
+(function(){
+ const mainEl=document.querySelector('main');
+ if(!SWAY||matchMedia('(prefers-reduced-motion: reduce)').matches||matchMedia('(hover: none)').matches)return;
+ let mx=0,my=0,sx=0,sy=0,running=false;
+ function frame(){
+  sx+=(mx-sx)*EASE;sy+=(my-sy)*EASE;
+  mainEl.style.setProperty('--dx',(-sx*SWAY).toFixed(1)+'px');
+  mainEl.style.setProperty('--dy',(-sy*SWAY*0.6).toFixed(1)+'px');
+  if(Math.abs(mx-sx)>0.001||Math.abs(my-sy)>0.001)requestAnimationFrame(frame);else running=false;
+ }
+ function kick(){if(!running){running=true;requestAnimationFrame(frame)}}
+ addEventListener('pointermove',e=>{mx=(e.clientX/innerWidth)*2-1;my=(e.clientY/innerHeight)*2-1;kick()});
+ document.documentElement.addEventListener('mouseleave',()=>{mx=my=0;kick()});
+})();
+
+</script>
+<script>
+/* ================== LOGIN: EDIT THESE ================== */
+const LOGO_SRC = "https://i.postimg.cc/8PVxFCdV/noughts-org.png";
+const ADMINS = { elin: "elin1234test" };   // names are not case-sensitive; passwords are
+/* ======================================================= */
+(function(){
+  if (LOGO_SRC) {
+    const img = new Image(); img.alt = "Logo"; img.src = LOGO_SRC;
+    document.getElementById("logoWrap").replaceChildren(img);
+  }
+  const screen = document.getElementById("loginScreen");
+  const appRoot = document.getElementById("appRoot");
+  const form = document.getElementById("loginForm");
+  const msg = document.getElementById("msg");
+  const lm = document.getElementById("loginMain");
+  let active = true;
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = document.getElementById("admin").value.trim().toLowerCase();
+    const pass = document.getElementById("pass").value.replace(/\s+/g, "");
+    const expected = ADMINS[name];
+    if (expected && pass === expected.replace(/\s+/g, "")) {
+      active = false;
+      screen.classList.add("gone");
+      appRoot.hidden = false;
+      document.body.classList.remove("locked");
+      window.scrollTo(0, 0);
+    } else {
+      msg.textContent = "Wrong admin name or password.";
+      form.classList.remove("shake"); void form.offsetWidth; form.classList.add("shake");
+    }
+  });
+
+  // gentle mouse sway on the login form
+  const SWAY = 14, EASE = 0.08;
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let mx = 0, my = 0, sx = 0, sy = 0;
+  addEventListener("pointermove", (e) => { mx = (e.clientX/innerWidth)*2-1; my = (e.clientY/innerHeight)*2-1; });
+  (function frame(){
+    if (!active) return;
+    sx += (mx - sx) * EASE; sy += (my - sy) * EASE;
+    if (!reduce) lm.style.transform = `translate(${(-sx*SWAY).toFixed(1)}px, ${(-sy*SWAY*0.6).toFixed(1)}px)`;
+    requestAnimationFrame(frame);
+  })();
+})();
+</script>
+</body>
+</html>
